@@ -22,7 +22,7 @@ CREATE TABLE employee (
     first_name: VARCHAR(30),
     last_name: VARCHAR(30),
     role_id: INT, --reference role
-    manager_id: INT, --reference another employee id
+    manager_id: INT, --reference the id of the manager employee
     FOREIGN KEY (role_id) REFERENCES role(id)
     FOREIGN KEY (manager_id) REFERENCES employee(id) -- null if the employee has no manager..
 )
