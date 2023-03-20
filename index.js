@@ -3,78 +3,35 @@ const mysql = require("mysql2");
 require("dotenv").config();
 require("console.table");
 
-// i think we need express bc we need a listener... aka a server
-const server = mysql.createServer();
-const PORT = process.env.PORT || 3001;
-
-server.listen(PORT);
-// Wrap the app in server connection
-server.on("connection", (conn) => {
-  console.log("Connected");
-
-  conn.on("end", remote.end.bind(remote));
-});
-
-// view all departments, view all roles, view all employees,
-// add a department, add a role, add an employee, and update an employee role
-// loop?
+// Ask if we can use sequelize
 
 // connect to sql with promise in order to use async / await
+// consider using a pool for better practice
 const db = mysql
   .createConnection(
-    // use dotenv
+    // Use dotenv to protect privacy
     {
-      host: process.env.DB_HOST,
-      // MySQL username,
+      host: "localhost",
       user: process.env.DB_USER,
-      // MySQL password
       password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+      database: "employees_db",
     },
     console.log(`Connected to the employees_db database.`)
   )
   .promise();
 
-const options = [
-  {
-    type: "list",
-    name: "next",
-    message: "What would you like to do next?",
-    choices: [
-      "View all departments",
-      "View all roles",
-      "View all employees",
-      "Add a department",
-      "Add a role",
-      "Add an employee",
-      "Update an employee role",
-      "Quit",
-    ],
-  },
-];
+// Query functions should be in a separate file
 
-// Query functions
-
-// Use get functions in order to avoid incorrectly entered information
-const getEmployees = async () => {
-  const employeeList = await db.query("SELECT * FROM employee");
-  return employeeList;
-};
-
-const getRoles = async () => {
-  const roleList = await db.query("SELECT * FROM role");
-  return roleList;
-};
-
-const getDepartments = async () => {
-  const departmentList = await db.query("SELECT * FROM department");
-  return departmentList;
+// Return all instances in a given table
+const getList = async (table) => {
+  const list = await db.query(`SELECT * FROM ${table}`);
+  return list;
 };
 
 // Prints a given table
 function viewTable(table) {
   db.query(`SELECT * FROM ${table}`, function (err, results) {
-    console.table(results); // use console table
+    console.table(results);
   });
 }
 
@@ -89,8 +46,8 @@ function addDepartment() {
   ];
 
   inquirer.prompt(questions).then((answers) => {
-    db.query(`INSERT INTO department (name) VALUES (${answers.name})`).then(
-      viewTable("department")
+    db.query(`INSERT INTO departments (name) VALUES (${answers.name})`).then(
+      viewTable("departments")
     );
   });
 }
@@ -112,17 +69,15 @@ function addRole() {
       type: "search-list",
       name: "department",
       message: "Enter the department for the role:",
-      choices: getDepartments(),
+      choices: getList("departments"),
     },
   ];
 
   inquirer.prompt(questions).then((answers) => {
     db.query(
-      `INSERT INTO role (title, salary, department) VALUES (${answers.title}, ${answers.salary}, ${answers.department})`
-    );
+      `INSERT INTO roles (title, salary, department) VALUES (${answers.title}, ${answers.salary}, ${answers.department})`
+    ).then(viewTable("roles"));
   });
-
-  viewTable("role");
 }
 
 function addEmployee() {
@@ -142,7 +97,7 @@ function addEmployee() {
       type: "search-list",
       name: "role",
       message: "Enter the role of the employee:",
-      choices: getRoles(),
+      choices: getList("roles"),
     },
     {
       type: "confirm",
@@ -153,24 +108,25 @@ function addEmployee() {
       type: "search-list",
       message: "Enter the name of the manager:",
       name: "manager",
-      choices: getEmployees(),
+      choices: getList("employees"),
       when: (answers) => answers.hasManager,
     },
   ];
 
-  inquirer.prompt(questions).then((answers) => {
-    if (answers.hasManager) {
-      db.query(
-        `INSERT INTO employee (first_name, last_name, role_id, manager) VALUES (${answers.first_name}, ${answers.last_name}, ${answers.role.id}, ${answers.manager.id})`
-      );
-    } else {
-      db.query(
-        `INSERT INTO employee (first_name, last_name, role_id, manager) VALUES (${answers.first_name}, ${answers.last_name}, ${answers.role.id}, NULL)`
-      );
-    }
-
-    viewTable("employee");
-  });
+  inquirer
+    .prompt(questions)
+    .then((answers) => {
+      if (answers.hasManager) {
+        db.query(
+          `INSERT INTO employees (first_name, last_name, role_id, manager) VALUES (${answers.first_name}, ${answers.last_name}, ${answers.role.id}, ${answers.manager.id})`
+        );
+      } else {
+        db.query(
+          `INSERT INTO employees (first_name, last_name, role_id, manager) VALUES (${answers.first_name}, ${answers.last_name}, ${answers.role.id}, NULL)`
+        );
+      }
+    })
+    .then(viewTable("employees"));
 }
 
 function updateEmployee() {
@@ -180,22 +136,22 @@ function updateEmployee() {
         type: "search-list",
         message: "Enter the employee's name:",
         name: "employee",
-        choices: getEmployees(),
+        choices: getList("employees"),
       },
       {
         type: "search-list",
         message: "What would you like their new role to be?",
         name: "role",
-        choices: getRoles(),
+        choices: getList("roles"),
       }
     )
     .then((answers) => {
       db.query(
-        `UPDATE employee SET role_id = ${answers.role.id} WHERE id = ${answers.employee.id}`
+        `UPDATE employees SET role_id = ${answers.role.id} WHERE id = ${answers.employee.id}`
       );
     });
 
-  viewTable("employee");
+  viewTable("employees");
 }
 
 // TODO: Create a function to initialize app
@@ -203,18 +159,37 @@ function updateEmployee() {
 // after each response, present the options again ("What would you like to do next?")
 // As long as they didn't choose Quit
 // Myabe use loop instead of calling the prompt over and over
+const options = [
+  {
+    type: "list",
+    name: "next",
+    message: "What would you like to do now?",
+    choices: [
+      "View all departments",
+      "View all roles",
+      "View all employees",
+      "Add a department",
+      "Add a role",
+      "Add an employee",
+      "Update an employee role",
+      "Quit",
+    ],
+  },
+];
+
 async function prompt() {
   const getNext = await inquirer.prompt(options);
+  // All of these functions can be exported from another file to keep this shit clean
 
   switch (getNext) {
     case "View all departments":
-      viewTable("department");
+      viewTable("departments");
       break;
     case "View all roles":
-      viewTable("role");
+      viewTable("roles");
       break;
     case "View all employees":
-      viewTable("employee");
+      viewTable("employees");
       break;
     case "Add a department":
       addDepartment();
@@ -230,6 +205,13 @@ async function prompt() {
       break;
     case "Quit":
       break;
+  }
+
+  if (getNext === "Quit") {
+    console.log("Goodbye!");
+  } else {
+    // Otherwise, prompt again
+    prompt();
   }
 }
 
