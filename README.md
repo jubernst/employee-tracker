@@ -2,7 +2,7 @@
 
 ## Description
 
-This project 
+This project is designed to allow users to access and update an existing database of employees.
 
 ## Table of Contents
 
